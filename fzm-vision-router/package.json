@@ -1,0 +1,39 @@
+{
+  "name": "fzm-vision-router",
+  "version": "0.4.1",
+  "description": "DSH (DeepSeek Harness) plugin: registers the vision_describe tool that routes image files to a dedicated vision model, so any session model can analyze images without switching models.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml",
+      "configSchema": {
+        "fields": {
+          "provider": { "type": "provider", "label": "provider(视觉路由)", "required": false },
+          "model": { "type": "model", "label": "model(视觉模型)", "required": false }
+        },
+        "defaults": { "provider": "kimi-coding", "model": "k3" }
+      }
+    }
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "vision",
+    "kimi",
+    "multimodal"
+  ]
+}

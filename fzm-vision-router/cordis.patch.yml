@@ -1,0 +1,24 @@
+# fzm-vision-router profile bundle layer.
+#
+# `dsh plugin --profile <name> add <this package>` installs the package and —
+# because package.json declares `dsh.bundle.patch` — appends it to the
+# profile's bundle stack; this patch then inserts the row into the HOST
+# composition, so every session and every agent preset on the profile gets the
+# `vision_describe` tool.
+#
+# The row registers into the host `tools` registry and consumes the host
+# `llm`, `attachments`, and `fs` services (all mounted by dsh-base); it
+# provides nothing itself, so it sits loose at the host plane like the other
+# tool rows.
+#
+# Override the vision backend per deployment from the user layer
+# (~/.dsh/profiles/<profile>/cordis.patch.yml):
+#
+#   - id: fzm-vision-router
+#     config:
+#       provider: kimi-coding
+#       model: k3
+
+- insert:
+    - id: fzm-vision-router
+      name: 'fzm-vision-router'

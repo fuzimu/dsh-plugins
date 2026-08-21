@@ -1,0 +1,42 @@
+{
+  "name": "fzm-plugin-manager",
+  "version": "0.4.0",
+  "description": "DSH (DeepSeek Harness) Web plugin: adds a '自定义插件' tab to Settings → Plugins — import / update / remove any DSH-compliant plugin bundle, list its composed rows, enable/disable a row, and edit a row's config (YAML) in the profile's user layer.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "DESIGN.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime"
+      ]
+    }
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "manager",
+    "web-ui"
+  ]
+}

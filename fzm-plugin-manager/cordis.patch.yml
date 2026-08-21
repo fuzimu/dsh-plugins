@@ -1,0 +1,15 @@
+# fzm-plugin-manager profile bundle layer.
+#
+# `dsh plugin --profile <name> add <this package>` installs the package and —
+# because package.json declares `dsh.bundle.patch` — appends it to the
+# profile's bundle stack; this patch inserts the row into the HOST
+# composition. The host entry registers three loopback HTTP routes on the
+# `webServer` service (list/import/remove) that the package's browser half
+# (`dsh.client`, served at /plugins/fzm-plugin-manager/client.js) talks to.
+#
+# The row provides no Cordis service and sits loose at the host plane like the
+# other tool rows.
+
+- insert:
+    - id: fzm-plugin-manager
+      name: 'fzm-plugin-manager'
