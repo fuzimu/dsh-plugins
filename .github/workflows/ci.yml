@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['20', '22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: fzm-plugin-manager — unit tests
+        working-directory: fzm-plugin-manager
+        run: npm test
+
+      - name: fzm-plugin-manager — client syntax check
+        working-directory: fzm-plugin-manager
+        run: node --check client.js
+
+      - name: fzm-plugin-manager — pack contents
+        working-directory: fzm-plugin-manager
+        run: npm pack --dry-run
+
+      - name: fzm-vision-router — unit tests
+        working-directory: fzm-vision-router
+        run: npm test
+
+      - name: fzm-vision-router — pack contents
+        working-directory: fzm-vision-router
+        run: npm pack --dry-run

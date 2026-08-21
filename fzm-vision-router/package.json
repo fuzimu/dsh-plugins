@@ -1,9 +1,12 @@
 {
   "name": "fzm-vision-router",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "DSH (DeepSeek Harness) plugin: registers the vision_describe tool that routes image files to a dedicated vision model, so any session model can analyze images without switching models.",
   "type": "module",
   "main": "index.js",
+  "scripts": {
+    "test": "node --test"
+  },
   "exports": {
     ".": "./index.js"
   },

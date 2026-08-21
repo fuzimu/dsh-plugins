@@ -89,6 +89,10 @@ function acceptedExtensions(attachments) {
   return allowed
 }
 
+// Test surface for test/*.test.js (node --test); the runtime contract only
+// consumes name/inject/apply.
+export const __testing = { resolveString, resolvePositiveInt, acceptedExtensions, EXT_BY_MEDIA_TYPE }
+
 export function apply(ctx, config) {
   const provider = resolveString(config?.provider, DEFAULT_PROVIDER)
   const model = resolveString(config?.model, DEFAULT_MODEL)

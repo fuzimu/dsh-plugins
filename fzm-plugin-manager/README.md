@@ -27,7 +27,7 @@ DeepSeek Harness(DSH)Web 插件:在 **设置 → 插件** 区新增「**自定�
 ## 安装(一条命令)
 
 ```bash
-dsh plugin --profile web add ./fzm-plugin-manager-0.4.1.tgz
+dsh plugin --profile web add ./fzm-plugin-manager-0.4.2.tgz
 # 或包目录:
 dsh plugin --profile web add /path/to/fzm-plugin-manager
 ```

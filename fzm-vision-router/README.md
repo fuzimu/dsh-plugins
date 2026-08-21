@@ -24,7 +24,7 @@ DeepSeek Harness(DSH)插件:注册 `vision_describe` 工具,把图片文件路�
 本包声明了 `dsh.bundle`,DSH CLI 会把它作为组合层自动激活:
 
 ```bash
-dsh plugin --profile web add ./fzm-vision-router-0.4.2.tgz
+dsh plugin --profile web add ./fzm-vision-router-0.4.3.tgz
 # 或者直接给包目录:
 dsh plugin --profile web add /path/to/fzm-vision-router
 ```

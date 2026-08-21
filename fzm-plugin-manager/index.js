@@ -300,6 +300,25 @@ function removeRowOverride(originalText, rowId) {
   return parts.length === 0 ? '' : parts.join('\n') + '\n'
 }
 
+// Test surface for test/*.test.js (node --test). The runtime plugin contract
+// only consumes name/inject/apply; these pure functions are exported so the
+// suite imports them directly instead of rewriting module source.
+export const __testing = {
+  isLocalSpec,
+  yamlScalar,
+  unquoteScalar,
+  indentYaml,
+  dedentYaml,
+  captureIndentedBlock,
+  parseRowFields,
+  parsePatchRows,
+  extractRowBlock,
+  renderRowBlock,
+  writeRowOverride,
+  removeRowOverride,
+  USER_PATCH_HEADER,
+}
+
 export function apply(ctx) {
   const fs = ctx.get('fs')
   const shell = ctx.get('shell')

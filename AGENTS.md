@@ -13,7 +13,8 @@ DSH(DeepSeek Harness)插件集。一目录一插件,各自独立打包、独立�
 ## 验证与发布
 
 - 语法:`node --input-type=module -e "await import('./index.js')"` + `node --check client.js`。
-- 纯函数(如 YAML 行块解析)回归:strip `export` 后在 node 里 round-trip 实测,不只靠读代码。
+- 测试:纯函数通过插件 `index.js` 导出的 `__testing` 面直接被 `test/*.test.js` 引用(`node --test`,即 `npm test`);CI 对每个插件跑测试 + 语法检查 + `npm pack --dry-run`。
+- 每个插件目录维护 `CHANGELOG.md`,发版同步更新。
 - 打包 `npm pack` 出 tgz;**tgz 不入库**(GitHub Releases 承载);tag 用 `<包名>-v<版本>`。
 - 换装到本机:`dsh plugin --profile web remove <pkg>` + `add <新tgz>`(update 对 `file:` 老路径会装回旧版);`dsh --dump-config --profile web` 验证组合;重启 `dsh web` 生效。
 
