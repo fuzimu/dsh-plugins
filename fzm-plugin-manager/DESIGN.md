@@ -75,15 +75,15 @@
 | `/inspect?path=` | GET/POST | 增强：返回规范符合性（`bundle`/`client`/`rows`/`configSchema`/`specValid`）+ 已安装状态 |
 | `/rows?package=` | GET/POST | 某 bundle 的行清单 |
 | `/config?package=&row=` | GET | 读某行"当前生效 config"（YAML 文本 + 对象） |
-| `/config` | POST | 写某行 config 覆盖（用户层） |
-| `/toggle?package=&row=` | POST | 行级 enable/disable |
-| `/update?package=` | POST | 转发 `dsh plugin --profile <p> update <pkg>` + reconcile |
+| `/config` | POST | 写某行 config 覆盖（用户层；body: package/row/configText） |
+| `/toggle` | POST | 行级 enable/disable（body: package/row/disabled） |
+| `/update` | POST | 转发 `dsh plugin --profile <p> update <pkg>`（body: name） |
 | `/import` / `/remove` | POST | 保留（增强返回） |
 
 实现要点：
 
 - `bundleInfo(pkgName)`：读包 manifest，解析 `dsh.bundle.patch` → `rows`，读 `dsh.client`、`dsh.bundle.configSchema`。
-- `parsePatchRows(text)`：用 `yaml` 解析；失败回退正则。输出行清单。
+- `parsePatchRows(text)` / `extractRowBlock(text, rowId)`：零依赖的正则行块解析（共享同一个字段游走器 `parseRowFields`），按缩进归属行块；用户层可能含 `!!js` 表达式，因此**刻意不解析 YAML**，只按行原文处理。
 - `readRowConfig(packageName, rowId)`：从"bundle 默认行"与"用户层覆盖行"解析当前生效 config。
 - `writeRowOverride(rowId, { config, disabled })`：按 id 定位用户层行块，整块替换或追加；保留其他内容。
 - 所有写操作先 `dirty = true`，提示"重启后生效"。

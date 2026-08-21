@@ -6,8 +6,8 @@
 
 | 插件 | 版本 | 说明 |
 |---|---|---|
-| [fzm-vision-router](fzm-vision-router/) | 0.4.1 | 注册 `vision_describe` 工具,把图片路由到专用视觉模型(默认 Kimi K3),纯文本主模型也能看图 |
-| [fzm-plugin-manager](fzm-plugin-manager/) | 0.4.0 | Web 设置页新增「自定义插件」管理页:导入/更新/卸载任意 DSH 插件包,行级启停与 config 编辑 |
+| [fzm-vision-router](fzm-vision-router/) | 0.4.2 | 注册 `vision_describe` 工具,把图片路由到专用视觉模型(默认 Kimi K3),纯文本主模型也能看图 |
+| [fzm-plugin-manager](fzm-plugin-manager/) | 0.4.1 | Web 设置页新增「自定义插件」管理页:导入/更新/卸载任意 DSH 插件包,行级启停与 config 编辑 |
 
 ## 安装
 

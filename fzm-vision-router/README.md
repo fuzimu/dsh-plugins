@@ -24,7 +24,7 @@ DeepSeek Harness(DSH)插件:注册 `vision_describe` 工具,把图片文件路�
 本包声明了 `dsh.bundle`,DSH CLI 会把它作为组合层自动激活:
 
 ```bash
-dsh plugin --profile web add ./fzm-vision-router-0.4.1.tgz
+dsh plugin --profile web add ./fzm-vision-router-0.4.2.tgz
 # 或者直接给包目录:
 dsh plugin --profile web add /path/to/fzm-vision-router
 ```
@@ -96,8 +96,8 @@ KIMI_CODING_API_KEY: sk-kimi-你的key
 
 ## 注意事项
 
-- **换视觉模型 = 换配置,不改插件**:插件是模型无关的。唯一要求是目标模型在路由目录里声明图片模态 —— deepseek 路由在 `settings.yaml` 的 `llm-deepseek.models` 给该模型加 `inputModalities: [text, image]`;pi-ai 路由在 `llm-pi-ai.providers.<id>.models[].input` 含 `image`(pi-ai 内置目录通常已默认声明)。若没声明:**挂载时日志会告警**「NOT image-capable」,首次调用报 `UNSUPPORTED_CONTENT` —— 不再是静默失败。
-- **图片格式跟随部署**:插件接受的格式从 `attachments.imageLimits.mediaTypes` 运行时派生(常见 PNG/JPEG/WebP/GIF;部署日后放开如 AVIF 也无需改插件)。
+- **换视觉模型 = 换配置,不改插件**:插件是模型无关的。唯一要求是目标模型在路由目录里声明图片模态 —— deepseek 路由在 `settings.yaml` 的 `llm-deepseek.models` 给该模型加 `inputModalities: [text, image]`;pi-ai 路由在 `llm-pi-ai.providers.<id>.models[].input` 含 `image`(pi-ai 内置目录通常已默认声明)。若没声明:**挂载时日志会告警**「NOT image-capable」,且工具在调用前的能力预检就会报出可操作的错误 —— 不再是静默失败(仅当目录里完全没有该模型条目时,才会落到适配器层的 `UNSUPPORTED_CONTENT`)。
+- **图片格式跟随部署**:插件接受的格式从 `attachments.imageLimits.mediaTypes` 运行时派生(常见 PNG/JPEG/WebP/GIF/AVIF 等已内置映射);若部署放开了映射表之外的全新媒体类型,需要在插件的 `EXT_BY_MEDIA_TYPE` 补一行映射才能识别其扩展名。
 - **直接粘贴图片进输入框**不受本插件保护:rc.8 的 DeepSeek 适配器对纯文本模型会在请求前拒绝含图历史。文本模型会话里看图请走**文件路径或 @ 引用文件**。
 - 单请求图片体积受部署的附件上限约束。
 - 本插件只注册工具、不发布服务,组合里**不需要** `isolate` realm。

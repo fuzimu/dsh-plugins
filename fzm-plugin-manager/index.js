@@ -44,6 +44,11 @@ const GUARD_HEADER = 'x-fzm-plugin-manager'
 const MAX_BODY_BYTES = 65536
 const USER_PATCH_FILENAME = 'cordis.patch.yml'
 
+// Legal npm package name — every handler that turns a client-supplied package
+// name into a filesystem path must pass it through this first (path traversal
+// guard: names like ../../etc never reach node_modules lookups).
+const PKG_NAME_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/i
+
 // Local vs official is decided by HOW the package is installed, not by its
 // name: the CLI installs path/tgz imports as `file:`-style specs, so a locally
 // imported package named @deepseek-ai/* must still count as local (and stay
@@ -87,130 +92,126 @@ function indentYaml(text, pad) {
     .join('\n')
 }
 
+// Capture the block of lines indented deeper than `parentIndent`, starting
+// after line index `j`. Blank lines are held pending and join the block only
+// when real content follows, so trailing blanks stay outside. Returns
+// { text, end, next }: `end` is one past the last content line, `next` the
+// first unconsumed line index.
+function captureIndentedBlock(lines, j, parentIndent) {
+  const blockLines = []
+  let pendingBlanks = 0
+  let k = j + 1
+  while (k < lines.length) {
+    const cl = lines[k]
+    if (cl.trim().length === 0) {
+      pendingBlanks++
+      k++
+      continue
+    }
+    const clm = /^(\s*)(\S.*)$/.exec(cl)
+    if (clm === null || clm[1].length <= parentIndent) break
+    while (pendingBlanks > 0) {
+      blockLines.push('')
+      pendingBlanks--
+    }
+    blockLines.push(cl)
+    k++
+  }
+  return { text: blockLines.join('\n'), end: k - pendingBlanks, next: k }
+}
+
+// Walk the field lines of the row whose `- id:` line sits at index `i`
+// (indent = that line's indent). Single walker behind both parsePatchRows and
+// extractRowBlock, so the two never drift apart. Multi-line fields (config,
+// block-style inject) capture by the FIELD line's own indent, so row-level
+// fields after them terminate the body instead of being swallowed. Returns:
+//   { end, name, disabled, hasConfig, configText, injectText }
+// `end` is one past the row's last content line (trailing blanks excluded);
+// `injectText` is the raw value text after `inject:` (inline), or the
+// newline-joined deeper lines (block style), or null when absent.
+function parseRowFields(lines, i, indent) {
+  const out = { end: i + 1, name: null, disabled: undefined, hasConfig: false, configText: '', injectText: null }
+  let j = i + 1
+  while (j < lines.length) {
+    const line = lines[j]
+    if (line.trim().length === 0) {
+      j++
+      continue
+    }
+    const lm = /^(\s*)(\S.*)$/.exec(line)
+    if (lm === null || lm[1].length <= indent) break
+    const t = lm[2].trim()
+    if (t.startsWith('name:')) out.name = unquoteScalar(t.slice(5).trim())
+    else if (t.startsWith('disabled:')) out.disabled = /^true$/i.test(t.slice(9).trim())
+    else if (t.startsWith('config:')) {
+      out.hasConfig = true
+      const cap = captureIndentedBlock(lines, j, lm[1].length)
+      out.configText = cap.text
+      out.end = cap.end
+      j = cap.next
+      continue
+    } else if (t.startsWith('inject:')) {
+      const rest = t.slice('inject:'.length).trim()
+      if (rest.length > 0) {
+        out.injectText = rest
+      } else {
+        const cap = captureIndentedBlock(lines, j, lm[1].length)
+        out.injectText = cap.text
+        out.end = cap.end
+        j = cap.next
+        continue
+      }
+    }
+    out.end = j + 1
+    j++
+  }
+  return out
+}
+
 // Parse a cordis.patch.yml into its row inventory. Every `- id: <id>` is a row
 // (whether from an `insert:` block or a top-level override). Rows are
 // attributed to their owning entry by indentation: a row's fields are the
 // following lines indented deeper than the `- id` line. Returns:
-//   [{ id, name, disabled, hasConfig, configText }]
+//   [{ id, name, disabled, hasConfig, configText, injectText }]
 function parsePatchRows(text) {
   const rows = []
   const lines = String(text).split('\n')
   for (let i = 0; i < lines.length; i++) {
     const m = /^(\s*)- id:\s*(\S+)\s*$/.exec(lines[i])
     if (m === null) continue
-    const indent = m[1].length
-    const row = { id: m[2], name: null, disabled: false, hasConfig: false, configText: '' }
-    let j = i + 1
-    while (j < lines.length) {
-      const line = lines[j]
-      if (line.trim().length === 0) {
-        j++
-        continue
-      }
-      const lm = /^(\s*)(\S.*)$/.exec(line)
-      if (lm === null || lm[1].length <= indent) break
-      const t = lm[2].trim()
-      if (t.startsWith('name:')) row.name = unquoteScalar(t.slice(5).trim())
-      else if (t.startsWith('disabled:')) row.disabled = /^true$/i.test(t.slice(9).trim())
-      else if (t.startsWith('config:')) {
-        row.hasConfig = true
-        // Capture the config body by the `config:` line's OWN indent, not the
-        // `- id` line's: row-level fields after `config:` (e.g. `disabled:`)
-        // sit between the two and must terminate the body, not be swallowed.
-        const configIndent = lm[1].length
-        const configLines = []
-        // Trailing blank lines are not part of the body: hold them pending
-        // and flush only when a deeper content line follows.
-        let pendingBlanks = 0
-        let k = j + 1
-        while (k < lines.length) {
-          const cl = lines[k]
-          if (cl.trim().length === 0) {
-            pendingBlanks++
-            k++
-            continue
-          }
-          const clm = /^(\s*)(\S.*)$/.exec(cl)
-          if (clm === null || clm[1].length <= configIndent) break
-          while (pendingBlanks > 0) {
-            configLines.push('')
-            pendingBlanks--
-          }
-          configLines.push(cl)
-          k++
-        }
-        row.configText = configLines.join('\n')
-        // Continue scanning: row-level fields may follow the config body.
-        j = k
-        continue
-      }
-      j++
-    }
-    rows.push(row)
-    i = j - 1
+    const f = parseRowFields(lines, i, m[1].length)
+    rows.push({
+      id: m[2],
+      name: f.name,
+      disabled: f.disabled === true,
+      hasConfig: f.hasConfig,
+      configText: f.configText,
+      injectText: f.injectText,
+    })
+    i = f.end - 1
   }
   return rows
 }
 
 // Locate the block in `text` that begins with `- id: <rowId>` and extends to
 // the next top-level entry (a line indented no deeper than the `- id` line).
-// Returns { start, end, name, disabled, configText, hasConfig } or null.
+// Returns { start, end, name, disabled, configText, hasConfig, injectText }
+// or null.
 function extractRowBlock(text, rowId) {
   const lines = String(text).split('\n')
   for (let i = 0; i < lines.length; i++) {
     const m = /^(\s*)- id:\s*(\S+)\s*$/.exec(lines[i])
     if (m === null || m[2] !== rowId) continue
-    const indent = m[1].length
-    const block = { start: i, end: i + 1, name: null, disabled: undefined, configText: '', hasConfig: false }
-    let j = i + 1
-    while (j < lines.length) {
-      const line = lines[j]
-      // Blank lines do not extend the block: trailing blanks stay outside
-      // [start, end) so rewrites preserve the separator before the next row.
-      if (line.trim().length === 0) {
-        j++
-        continue
-      }
-      const lm = /^(\s*)(\S.*)$/.exec(line)
-      if (lm === null || lm[1].length <= indent) break
-      const t = lm[2].trim()
-      if (t.startsWith('name:')) block.name = unquoteScalar(t.slice(5).trim())
-      else if (t.startsWith('disabled:')) block.disabled = /^true$/i.test(t.slice(9).trim())
-      else if (t.startsWith('config:')) {
-        block.hasConfig = true
-        // Same indent baseline as parsePatchRows: the `config:` line's own
-        // indent, so row-level fields after it terminate the body.
-        const configIndent = lm[1].length
-        const configLines = []
-        let pendingBlanks = 0
-        let k = j + 1
-        while (k < lines.length) {
-          const cl = lines[k]
-          if (cl.trim().length === 0) {
-            pendingBlanks++
-            k++
-            continue
-          }
-          const clm = /^(\s*)(\S.*)$/.exec(cl)
-          if (clm === null || clm[1].length <= configIndent) break
-          while (pendingBlanks > 0) {
-            configLines.push('')
-            pendingBlanks--
-          }
-          configLines.push(cl)
-          k++
-        }
-        block.configText = configLines.join('\n')
-        // Exclude trailing pending blanks from the block extent.
-        block.end = k - pendingBlanks
-        // Continue scanning: row-level fields may follow the config body.
-        j = k
-        continue
-      }
-      block.end = j + 1
-      j++
+    const f = parseRowFields(lines, i, m[1].length)
+    return {
+      start: i,
+      end: f.end,
+      name: f.name,
+      disabled: f.disabled,
+      configText: f.configText,
+      hasConfig: f.hasConfig,
+      injectText: f.injectText,
     }
-    return block
   }
   return null
 }
@@ -230,7 +231,8 @@ function dedentYaml(text) {
   return lines.map((line) => (line.trim().length === 0 ? '' : line.slice(min))).join('\n')
 }
 
-// Render one user-layer row block for `rowId`. `name` is preserved when known;
+// Render one user-layer row block for `rowId`. `name`/`injectText` are
+// preserved when known (a rewrite must never silently drop a row's inject);
 // `configText` (raw YAML object body) is dedented to its canonical form and
 // nested under `config:`; `disabled` emits `disabled: true` only when
 // explicitly true.
@@ -239,6 +241,10 @@ function renderRowBlock(rowId, patch) {
   if (patch.name !== undefined && patch.name !== null && String(patch.name).length > 0) {
     out += '  name: ' + yamlScalar(patch.name) + '\n'
   }
+  if (typeof patch.injectText === 'string' && patch.injectText.trim().length > 0) {
+    const t = dedentYaml(patch.injectText)
+    out += t.indexOf('\n') === -1 ? '  inject: ' + t.trim() + '\n' : '  inject:\n' + indentYaml(t, '    ') + '\n'
+  }
   if (typeof patch.configText === 'string' && patch.configText.trim().length > 0) {
     out += '  config:\n' + indentYaml(dedentYaml(patch.configText), '    ') + '\n'
   }
@@ -246,18 +252,25 @@ function renderRowBlock(rowId, patch) {
   return out
 }
 
+// Header written when the user layer file is created from empty.
+const USER_PATCH_HEADER =
+  '# User-layer row overrides for this profile composition.\n' +
+  '# Rows here override composition rows by id (whole-row replace). Written by\n' +
+  '# fzm-plugin-manager; hand edits and comments outside row blocks are preserved.\n'
+
 // Write (replace or append) a user-layer row block for `rowId` in
 // `originalText`. Preserves every other byte. Returns the new text.
 function writeRowOverride(originalText, rowId, patch) {
   const block = extractRowBlock(originalText, rowId)
   const newBlock = renderRowBlock(rowId, {
     name: patch.name !== undefined ? patch.name : block ? block.name : undefined,
+    injectText: patch.injectText !== undefined ? patch.injectText : block ? block.injectText : undefined,
     configText: patch.configText !== undefined ? patch.configText : block ? block.configText : undefined,
     disabled: patch.disabled !== undefined ? patch.disabled : block ? block.disabled : undefined,
   }).replace(/\n$/, '')
   if (block === null) {
     const trimmed = String(originalText).replace(/\s+$/, '')
-    return (trimmed.length === 0 ? '' : trimmed + '\n') + newBlock + '\n'
+    return (trimmed.length === 0 ? USER_PATCH_HEADER : trimmed + '\n') + newBlock + '\n'
   }
   const lines = String(originalText).split('\n')
   const before = lines.slice(0, block.start)
@@ -290,12 +303,10 @@ function removeRowOverride(originalText, rowId) {
 export function apply(ctx) {
   const fs = ctx.get('fs')
   const shell = ctx.get('shell')
-  const webServer = ctx.get('webServer')
+  // `webServer` is a hard dependency (see inject above): apply runs only after
+  // it mounts, so it is read directly here — no undefined branch exists.
+  const webServer = ctx.webServer
   const logger = ctx.logger && typeof ctx.logger.warn === 'function' ? ctx.logger : console
-  if (webServer === undefined) {
-    logger.warn('[fzm-plugin-manager] webServer service is not mounted (not a web profile?); staying inert')
-    return
-  }
 
   let dirty = false
   let homeCache
@@ -356,6 +367,7 @@ export function apply(ctx) {
 
   // Read a bundle's metadata + row inventory + client/configSchema presence.
   async function bundleInfo(profileDir, pkgName) {
+    if (!PKG_NAME_RE.test(pkgName)) throw new Error('包名不合法: ' + pkgName)
     const manifest = await readJson(profileDir + '/node_modules/' + pkgName + '/package.json')
     const patchRel =
       manifest.dsh && manifest.dsh.bundle && typeof manifest.dsh.bundle.patch === 'string' ? manifest.dsh.bundle.patch : null
@@ -520,12 +532,13 @@ export function apply(ctx) {
     return { ok: true, row: rowId.trim(), source: 'none', configText: '', disabled: false, name: null }
   }
 
-  // Write the user-layer patch and immediately validate the WHOLE composition
-  // by re-running `dsh --dump-config`: an invalid override (broken YAML, a
-  // config shape the loader rejects) would otherwise only surface at the next
-  // boot as a failed startup. On validation failure the original text is
-  // restored and the error returned. Returns null on success, or the error
-  // message to report.
+  // Write the user-layer patch and immediately re-compose the profile with
+  // `dsh --dump-config`: a broken override (e.g. malformed YAML that fails
+  // composition) would otherwise only surface at the next boot. A non-zero
+  // compose exit restores the original text and reports the error. The write
+  // is kept when validation cannot run at all (no shell service, or the CLI
+  // invocation itself fails) — matching the pre-validation behavior rather
+  // than blocking edits. Returns null on success, or the error to report.
   async function writeUserPatchValidated(profileDir, original, next) {
     const patchFile = profileDir + '/' + USER_PATCH_FILENAME
     await writeText(patchFile, next)
@@ -604,7 +617,6 @@ export function apply(ctx) {
     const sourceManifest = await getSourceManifest(spec, isTarball)
     if (!sourceManifest) return { ok: false, message: 'package.json 无法解析,不是合法的插件包' }
     const pkgName = typeof sourceManifest.name === 'string' ? sourceManifest.name.trim() : ''
-    const PKG_NAME_RE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/i
     if (pkgName.length === 0 || !PKG_NAME_RE.test(pkgName)) {
       return { ok: false, message: '包名不合法: ' + (pkgName || '(空)') }
     }
@@ -848,7 +860,14 @@ export function apply(ctx) {
 
   async function readTarballFile(spec, relPath) {
     if (shell === undefined) throw new Error('shell service is not mounted')
-    const result = await shell.run(shell.resolve({ command: 'tar -xzf ' + quote(spec) + ' -O package/' + relPath, timeoutMs: 20000 }))
+    // relPath comes from the INSPECTED package's own manifest (untrusted):
+    // whitelist the charset and quote it before it touches a shell command.
+    if (!/^[A-Za-z0-9._/-]+$/.test(relPath) || relPath.includes('..')) {
+      throw new Error('非法的包内路径: ' + relPath)
+    }
+    const result = await shell.run(
+      shell.resolve({ command: 'tar -xzf ' + quote(spec) + ' -O ' + quote('package/' + relPath), timeoutMs: 20000 }),
+    )
     const out = result.stdout && typeof result.stdout.text === 'string' ? result.stdout.text : ''
     return out
   }

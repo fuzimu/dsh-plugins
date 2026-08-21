@@ -1,6 +1,6 @@
 {
   "name": "fzm-plugin-manager",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "DSH (DeepSeek Harness) Web plugin: adds a '自定义插件' tab to Settings → Plugins — import / update / remove any DSH-compliant plugin bundle, list its composed rows, enable/disable a row, and edit a row's config (YAML) in the profile's user layer.",
   "type": "module",
   "main": "index.js",

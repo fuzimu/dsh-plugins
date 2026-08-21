@@ -27,7 +27,7 @@ DeepSeek Harness(DSH)Web 插件:在 **设置 → 插件** 区新增「**自定�
 ## 安装(一条命令)
 
 ```bash
-dsh plugin --profile web add ./fzm-plugin-manager-0.4.0.tgz
+dsh plugin --profile web add ./fzm-plugin-manager-0.4.1.tgz
 # 或包目录:
 dsh plugin --profile web add /path/to/fzm-plugin-manager
 ```
@@ -45,7 +45,7 @@ dsh --dump-config --profile web | grep -A2 plugin-manager
 
 1. 重启后打开 **设置 → 插件 → 自定义插件**
 2. 「+ 添加本地插件」→ 弹出系统目录选择器(复用官方 picker,选中即返回服务器侧路径);远程/SSH 部署无原生对话框时自动切换为手动输入
-   - 选择包含 `package.json` 的插件目录;`.tgz` 请先解压为目录
+   - 选择包含 `package.json` 的插件目录,或直接给 `.tgz` 包文件(导入前会先做规范校验)
    - 导入声明了 `dsh.bundle` 的包自动加入 profile 组合,重启后启用;未声明的包会提示"已安装为依赖,不会自动进入组合"
 3. **行级管理**:列表项可展开,显示该包贡献的组合行;每行可 **启用/禁用**、**编辑 config**(YAML 文本框,整行替换该行 config)
 4. 本地插件可 **更新**、**卸载**(两步确认)
@@ -89,7 +89,7 @@ dsh plugin --profile web remove fzm-plugin-manager
 - **需要 DSH ≥ v0.1.0-rc.8**,web profile 默认绑定回环地址;若部署绑 `0.0.0.0`,这些路由会随之暴露到局域网,请自行评估
 - 变更都需要**重启 dsh web** 才生效(组合在启动时组装)
 - **config 覆盖是整行替换**(不 merge):编辑时会加载"当前生效 config"(含插件默认 + 用户层覆盖)避免误丢字段
-- 行级 config/toggle 写入后会立即用 `dsh --dump-config` 重组校验,校验失败自动回滚并返回错误 —— 不会把坏 YAML 留到下次启动
+- 行级 config/toggle 写入后会立即用 `dsh --dump-config` 重组校验,组合失败自动回滚并返回错误(CLI 不可用等无法校验的场景保留写入并在日志告警)
 - 卸载本地插件时,会一并清理用户层 `cordis.patch.yml` 中该包的行覆盖,不留无主行
 - 列表的「组合中」状态来自对磁盘文件的**重新组合**(`dsh --dump-config`),不是运行中进程的实况;是否已加载以重启为准
 - 用户层 `cordis.patch.yml` 可能含 `!!js` 表达式,本插件只按行原文处理,不解析,避免破坏

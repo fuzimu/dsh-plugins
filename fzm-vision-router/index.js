@@ -36,7 +36,10 @@
 
 export const name = 'fzm-vision-router'
 
-export const inject = ['tools', 'llm']
+// All four are hard dependencies: the tool cannot function without any of
+// them, so the row waits for them instead of failing at first call. They are
+// read as ctx.<name> below (guaranteed by inject), never via ctx.get guards.
+export const inject = ['tools', 'llm', 'attachments', 'fs']
 
 const DEFAULT_PROVIDER = 'kimi-coding'
 const DEFAULT_MODEL = 'k3'
@@ -75,12 +78,6 @@ function resolvePositiveInt(value, fallback) {
   return Number.isSafeInteger(n) && n > 0 ? n : fallback
 }
 
-function requireService(ctx, name) {
-  const service = ctx.get(name)
-  if (service === undefined) throw new Error(`${name} service is not mounted`)
-  return service
-}
-
 /** The extension->mediaType map accepted by this deployment's attachment store. */
 function acceptedExtensions(attachments) {
   const allowed = new Map()
@@ -103,27 +100,25 @@ export function apply(ctx, config) {
   // that is not resolvable yet OR whose catalog entry is not image-capable,
   // so a missing settings/credential setup or a model declared text-only is
   // visible in the harness log instead of surfacing only at first tool call.
-  const llm = ctx.get('llm')
-  if (llm !== undefined) {
-    Promise.resolve()
-      .then(() => llm.resolveModelInfo(provider, model))
-      .then((info) => {
-        const modalities = info?.inputModalities
-        if (modalities !== undefined && modalities.includes('image') !== true) {
-          logger.warn(
-            `[vision-router] route ${provider}/${model} resolves but its catalog entry is NOT image-capable (inputModalities: ${JSON.stringify(modalities)}). ` +
-              'vision_describe will fail with UNSUPPORTED_CONTENT on the first image call. ' +
-              'Add "image" to the model\u2019s inputModalities (llm-deepseek.models) or input (llm-pi-ai providers) in settings.yaml.',
-          )
-        }
-      })
-      .catch((error) => {
+  const llm = ctx.llm
+  Promise.resolve()
+    .then(() => llm.resolveModelInfo(provider, model))
+    .then((info) => {
+      const modalities = info?.inputModalities
+      if (modalities !== undefined && modalities.includes('image') !== true) {
         logger.warn(
-          `[vision-router] route ${provider}/${model} is not resolvable yet: ${error?.message ?? error}. ` +
-            'Configure it via settings.yaml plus its credential; the tool reports the same error when called.',
+          `[vision-router] route ${provider}/${model} resolves but its catalog entry is NOT image-capable (inputModalities: ${JSON.stringify(modalities)}). ` +
+            'vision_describe will reject image calls at its capability preflight. ' +
+            'Add "image" to the model’s inputModalities (llm-deepseek.models) or input (llm-pi-ai providers) in settings.yaml.',
         )
-      })
-  }
+      }
+    })
+    .catch((error) => {
+      logger.warn(
+        `[vision-router] route ${provider}/${model} is not resolvable yet: ${error?.message ?? error}. ` +
+          'Configure it via settings.yaml plus its credential; the tool reports the same error when called.',
+      )
+    })
 
   ctx.tools.register({
     name: 'vision_describe',
@@ -163,9 +158,9 @@ export function apply(ctx, config) {
     async execute(args, exec) {
       const filePath = typeof args?.file_path === 'string' ? args.file_path.trim() : ''
       if (filePath.length === 0) throw new Error('file_path must be a non-empty string')
-      const llmSvc = requireService(ctx, 'llm')
-      const attachments = requireService(ctx, 'attachments')
-      const fs = requireService(ctx, 'fs')
+      const llmSvc = ctx.llm
+      const attachments = ctx.attachments
+      const fs = ctx.fs
 
       // Accepted formats come from the deployment's image limits, not a
       // hardcoded whitelist, so formats the deployment admits later keep

@@ -75,15 +75,18 @@ window.__ModuleLoader__.load({
       '.plgx-chip { font-size: 11px; border-radius: 6px; padding: 1px 6px; border: 1px solid var(--dsw-alias-border-l2); color: var(--dsw-alias-label-secondary); }',
     ].join('\n')
 
+    // Returns a disposer removing the tag (registered via ctx.effect), or
+    // undefined when nothing was inserted (no document, or already present).
     function insertStyles() {
-      if (typeof document === 'undefined') return
+      if (typeof document === 'undefined') return undefined
       var tagId = 'fzm-plugin-manager/styles'
-      if (document.querySelector('style[data-plugin-css=' + JSON.stringify(tagId) + ']') !== null) return
+      if (document.querySelector('style[data-plugin-css=' + JSON.stringify(tagId) + ']') !== null) return undefined
       var tag = document.createElement('style')
       tag.dataset.plugin = 'fzm-plugin-manager'
       tag.dataset.pluginCss = tagId
       tag.textContent = CSS
       document.head.appendChild(tag)
+      return function () { tag.remove() }
     }
 
     function apiJson(path, method, body) {
@@ -815,7 +818,7 @@ window.__ModuleLoader__.load({
     var inject = ['slots']
 
     function apply(ctx) {
-      insertStyles()
+      ctx.effect(insertStyles)
       workspaces = ctx.get('workspaces') || null
       ctx.slots.inject('settings.plugins.tab', function () {
         return ctx.slots.register(
