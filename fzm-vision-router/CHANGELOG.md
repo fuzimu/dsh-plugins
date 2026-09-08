@@ -1,5 +1,9 @@
 # Changelog — fzm-vision-router
 
+## 0.4.4
+
+- 注释说明 `EXT_BY_MEDIA_TYPE` 中 avif/bmp/tiff 为前瞻性条目:DSH 当前 `ImageMediaType` 仍是 png/jpeg/webp/gif 的封闭联合,这几行暂不可达,部署放开对应媒体类型后自动生效(纯注释,无行为变化)
+
 ## 0.4.3
 
 - 导出 `__testing` 测试面,新增 `node --test` 单元测试(5 例)

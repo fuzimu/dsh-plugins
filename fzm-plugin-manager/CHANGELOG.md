@@ -1,5 +1,9 @@
 # Changelog — fzm-plugin-manager
 
+## 0.4.3
+
+- `/list` 响应补 `ok: true`,与其余路由的返回约定一致(附加字段,client 不受影响)
+
 ## 0.4.2
 
 - 导出 `__testing` 测试面,新增 `node --test` 解析器回归套件(12 例)

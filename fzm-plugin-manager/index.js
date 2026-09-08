@@ -472,7 +472,7 @@ export function apply(ctx) {
       if (bundles.includes(pkgName)) continue
       items.push(await buildItem(pkgName))
     }
-    return { items, dirty, profileDir }
+    return { ok: true, items, dirty, profileDir }
   }
 
   async function runDsh(tail) {

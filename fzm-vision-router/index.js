@@ -52,6 +52,11 @@ const DEFAULT_TIMEOUT_MS = 180000
 // plugin update. Media types the deployment allows but this table cannot map
 // to extensions stay rejected — the mapping is the plugin's only hardcoded
 // knowledge about file formats.
+//
+// DSH's ImageMediaType is currently a closed union of png/jpeg/webp/gif, so
+// only those four rows are reachable today. avif/bmp/tiff are forward-looking
+// entries: they activate on their own once a deployment admits those media
+// types, and cost nothing while it does not.
 const EXT_BY_MEDIA_TYPE = {
   'image/png': ['.png'],
   'image/jpeg': ['.jpg', '.jpeg'],
